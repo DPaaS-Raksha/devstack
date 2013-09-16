@@ -27,9 +27,10 @@ DATA_DIR=${DATA_DIR:-${DEST}/data}
 # Get project function libraries
 source $TOP_DIR/lib/baremetal
 source $TOP_DIR/lib/cinder
+source $TOP_DIR/lib/raksha
 source $TOP_DIR/lib/horizon
 source $TOP_DIR/lib/swift
-source $TOP_DIR/lib/neutron
+source $TOP_DIR/lib/quantum
 
 # Determine what system we are running on.  This provides ``os_VENDOR``,
 # ``os_RELEASE``, ``os_UPDATE``, ``os_PACKAGE``, ``os_CODENAME``
@@ -50,7 +51,7 @@ fi
 
 if [[ "$Q_USE_DEBUG_COMMAND" == "True" ]]; then
     source $TOP_DIR/openrc
-    teardown_neutron_debug
+    teardown_quantum_debug
 fi
 
 # Shut down devstack's screen to get the bulk of OpenStack services in one shot
@@ -90,6 +91,10 @@ if is_service_enabled cinder; then
     cleanup_cinder
 fi
 
+if is_service_enabled raksha; then
+    cleanup_raksha
+fi
+
 if [[ -n "$UNSTACK_ALL" ]]; then
     # Stop MySQL server
     if is_service_enabled mysql; then
@@ -106,10 +111,8 @@ if [[ -n "$UNSTACK_ALL" ]]; then
     fi
 fi
 
-if is_service_enabled neutron; then
-    stop_neutron
-    stop_neutron_third_party
-    cleanup_neutron
+if is_service_enabled quantum; then
+    stop_quantum
+    stop_quantum_third_party
+    cleanup_quantum
 fi
-
-cleanup_tmp

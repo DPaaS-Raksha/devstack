@@ -9,7 +9,7 @@ echo "Begin DevStack Exercise: $0"
 echo "*********************************************************************"
 
 # This script exits on an error so that errors don't compound and you see
-# only the first error that occurred.
+# only the first error that occured.
 set -o errexit
 
 # Print the commands being run so that we can see the command that triggers
@@ -30,9 +30,9 @@ source $TOP_DIR/functions
 # Import configuration
 source $TOP_DIR/openrc
 
-# Import neutron functions if needed
-if is_service_enabled neutron; then
-    source $TOP_DIR/lib/neutron
+# Import quantum functions if needed
+if is_service_enabled quantum; then
+    source $TOP_DIR/lib/quantum
 fi
 
 # Import exercise configuration
@@ -56,8 +56,6 @@ TEST_FLOATING_POOL=${TEST_FLOATING_POOL:-test}
 # Instance name
 VM_NAME="ex-float"
 
-# Cells does not support floating ips API calls
-is_service_enabled n-cell && exit 55
 
 # Launching a server
 # ==================
@@ -157,7 +155,7 @@ nova add-floating-ip $VM_UUID $FLOATING_IP || \
 # Test we can ping our floating IP within ASSOCIATE_TIMEOUT seconds
 ping_check "$PUBLIC_NETWORK_NAME" $FLOATING_IP $ASSOCIATE_TIMEOUT
 
-if ! is_service_enabled neutron; then
+if ! is_service_enabled quantum; then
     # Allocate an IP from second floating pool
     TEST_FLOATING_IP=$(nova floating-ip-create $TEST_FLOATING_POOL | grep $TEST_FLOATING_POOL | get_field 1)
     die_if_not_set $LINENO TEST_FLOATING_IP "Failure creating floating IP in $TEST_FLOATING_POOL"
@@ -181,7 +179,7 @@ fi
 # Clean up
 # --------
 
-if ! is_service_enabled neutron; then
+if ! is_service_enabled quantum; then
     # Delete second floating IP
     nova floating-ip-delete $TEST_FLOATING_IP || \
         die $LINENO "Failure deleting floating IP $TEST_FLOATING_IP"

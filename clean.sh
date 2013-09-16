@@ -39,10 +39,11 @@ source $TOP_DIR/lib/keystone
 source $TOP_DIR/lib/glance
 source $TOP_DIR/lib/nova
 source $TOP_DIR/lib/cinder
+source $TOP_DIR/lib/raksha
 source $TOP_DIR/lib/swift
 source $TOP_DIR/lib/ceilometer
 source $TOP_DIR/lib/heat
-source $TOP_DIR/lib/neutron
+source $TOP_DIR/lib/quantum
 source $TOP_DIR/lib/baremetal
 source $TOP_DIR/lib/ldap
 
@@ -57,13 +58,14 @@ fi
 
 # Clean projects
 cleanup_cinder
+cleanup_raksha
 cleanup_glance
 cleanup_keystone
 cleanup_nova
-cleanup_neutron
+cleanup_quantum
 cleanup_swift
 
-# cinder doesn't always clean up the volume group as it might be used elsewhere...
+# cinder doesn't clean up the volume group as it might be used elsewhere...
 # clean it up if it is a loop device
 VG_DEV=$(sudo losetup -j $DATA_DIR/${VOLUME_GROUP}-backing-file | awk -F':' '/backing-file/ { print $1}')
 if [[ -n "$VG_DEV" ]]; then
@@ -76,7 +78,7 @@ fi
 
 
 # Clean out /etc
-sudo rm -rf /etc/keystone /etc/glance /etc/nova /etc/cinder /etc/swift
+sudo rm -rf /etc/keystone /etc/glance /etc/nova /etc/cinder /etc/swift /etc/raksha
 
 # Clean out tgt
 sudo rm /etc/tgt/conf.d/*

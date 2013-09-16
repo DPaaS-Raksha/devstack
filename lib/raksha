@@ -1,0 +1,259 @@
+# lib/raksha
+# Install and start **Raksha** backup job service
+
+# Dependencies:
+# - functions
+# - DEST, DATA_DIR, STACK_USER must be defined
+# SERVICE_{TENANT_NAME|PASSWORD} must be defined
+# ``KEYSTONE_TOKEN_FORMAT`` must be defined
+
+# stack.sh
+# ---------
+# install_raksha
+# configure_raksha
+# init_raksha
+# start_raksha
+# stop_raksha
+# cleanup_raksha
+
+# Save trace setting
+XTRACE=$(set +o | grep xtrace)
+set +o xtrace
+
+
+# Defaults
+# --------
+
+# set up default driver
+RAKSHA_DRIVER=${RAKSHA_DRIVER:-default}
+
+# set up default directories
+RAKSHA_DIR=$DEST/raksha
+RAKSHACLIENT_DIR=$DEST/python-rakshaclient
+RAKSHA_STATE_PATH=${RAKSHA_STATE_PATH:=$DATA_DIR/raksha}
+RAKSHA_AUTH_CACHE_DIR=${RAKSHA_AUTH_CACHE_DIR:-/var/cache/raksha}
+
+RAKSHA_CONF_DIR=/etc/raksha
+RAKSHA_CONF=$RAKSHA_CONF_DIR/raksha.conf
+RAKSHA_API_PASTE_INI=$RAKSHA_CONF_DIR/api-paste.ini
+
+# Public facing bits
+RAKSHA_SERVICE_HOST=${RAKSHA_SERVICE_HOST:-$SERVICE_HOST}
+RAKSHA_SERVICE_PORT=${RAKSHA_SERVICE_PORT:-8779}
+RAKSHA_SERVICE_PORT_INT=${RAKSHA_SERVICE_PORT_INT:-18779}
+RAKSHA_SERVICE_PROTOCOL=${RAKSHA_SERVICE_PROTOCOL:-$SERVICE_PROTOCOL}
+
+# Support entry points installation of console scripts
+if [[ -d $RAKSHA_DIR/bin ]]; then
+    RAKSHA_BIN_DIR=$RAKSHA_DIR/bin
+else
+    RAKSHA_BIN_DIR=$(get_python_exec_prefix)
+fi
+
+# Support for multi lvm backend configuration (default is no support)
+RAKSHA_MULTI_LVM_BACKEND=$(trueorfalse False $RAKSHA_MULTI_LVM_BACKEND)
+
+# Should raksha perform secure deletion of backupjobs?
+RAKSHA_SECURE_DELETE=`trueorfalse True $RAKSHA_SECURE_DELETE`
+
+BACKUPJOB_NAME_PREFIX=${BACKUPJOB_NAME_PREFIX:-backupjob-}
+
+
+# Functions
+# ---------
+
+# cleanup_raksha() - 
+function cleanup_raksha() {
+    echo "cleanup_raksha"
+}
+
+# configure_raksha() - Set config files, create data dirs, etc
+function configure_raksha() {
+    if [[ ! -d $RAKSHA_CONF_DIR ]]; then
+        sudo mkdir -p $RAKSHA_CONF_DIR
+    fi
+    sudo chown $STACK_USER $RAKSHA_CONF_DIR
+
+    cp -p $RAKSHA_DIR/etc/raksha/policy.json $RAKSHA_CONF_DIR
+
+    # Set the paths of certain binaries
+    RAKSHA_ROOTWRAP=$(get_rootwrap_location raksha)
+
+    # If Raksha ships the new rootwrap filters files, deploy them
+    # (owned by root) and add a parameter to $RAKSHA_ROOTWRAP
+    ROOTWRAP_RAKSHA_SUDOER_CMD="$RAKSHA_ROOTWRAP"
+    if [[ -d $RAKSHA_DIR/etc/raksha/rootwrap.d ]]; then
+        # Wipe any existing rootwrap.d files first
+        if [[ -d $RAKSHA_CONF_DIR/rootwrap.d ]]; then
+            sudo rm -rf $RAKSHA_CONF_DIR/rootwrap.d
+        fi
+        # Deploy filters to /etc/raksha/rootwrap.d
+        sudo mkdir -m 755 $RAKSHA_CONF_DIR/rootwrap.d
+        sudo cp $RAKSHA_DIR/etc/raksha/rootwrap.d/*.filters $RAKSHA_CONF_DIR/rootwrap.d
+        sudo chown -R root:root $RAKSHA_CONF_DIR/rootwrap.d
+        sudo chmod 644 $RAKSHA_CONF_DIR/rootwrap.d/*
+        # Set up rootwrap.conf, pointing to /etc/raksha/rootwrap.d
+        sudo cp $RAKSHA_DIR/etc/raksha/rootwrap.conf $RAKSHA_CONF_DIR/
+        sudo sed -e "s:^filters_path=.*$:filters_path=$RAKSHA_CONF_DIR/rootwrap.d:" -i $RAKSHA_CONF_DIR/rootwrap.conf
+        sudo chown root:root $RAKSHA_CONF_DIR/rootwrap.conf
+        sudo chmod 0644 $RAKSHA_CONF_DIR/rootwrap.conf
+        # Specify rootwrap.conf as first parameter to raksha-rootwrap
+        RAKSHA_ROOTWRAP="$RAKSHA_ROOTWRAP $RAKSHA_CONF_DIR/rootwrap.conf"
+        ROOTWRAP_RAKSHA_SUDOER_CMD="$RAKSHA_ROOTWRAP *"
+    fi
+
+    TEMPFILE=`mktemp`
+    echo "$USER ALL=(root) NOPASSWD: $ROOTWRAP_RAKSHA_SUDOER_CMD" >$TEMPFILE
+    chmod 0440 $TEMPFILE
+    sudo chown root:root $TEMPFILE
+    sudo mv $TEMPFILE /etc/sudoers.d/raksha-rootwrap
+
+    cp $RAKSHA_DIR/etc/raksha/api-paste.ini $RAKSHA_API_PASTE_INI
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken auth_host $KEYSTONE_AUTH_HOST
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken auth_port $KEYSTONE_AUTH_PORT
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken auth_protocol $KEYSTONE_AUTH_PROTOCOL
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken admin_tenant_name $SERVICE_TENANT_NAME
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken admin_user raksha
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken admin_password $SERVICE_PASSWORD
+    iniset $RAKSHA_API_PASTE_INI filter:authtoken signing_dir $RAKSHA_AUTH_CACHE_DIR
+
+    cp $RAKSHA_DIR/etc/raksha/raksha.conf.sample $RAKSHA_CONF
+    iniset $RAKSHA_CONF DEFAULT auth_strategy keystone
+    iniset $RAKSHA_CONF DEFAULT debug True
+    iniset $RAKSHA_CONF DEFAULT verbose True
+    iniset $RAKSHA_CONF DEFAULT sql_connection `database_connection_url raksha`
+    iniset $RAKSHA_CONF DEFAULT api_paste_config $RAKSHA_API_PASTE_INI
+    iniset $RAKSHA_CONF DEFAULT rootwrap_config "$RAKSHA_CONF_DIR/rootwrap.conf"
+    iniset $RAKSHA_CONF DEFAULT state_path $RAKSHA_STATE_PATH
+    iniset $RAKSHA_CONF DEFAULT periodic_interval $RAKSHA_PERIODIC_INTERVAL
+    iniset $RAKSHA_CONF DEFAULT compute_driver libvirt.LibvirtDriver
+    iniset $RAKSHA_CONF DEFAULT libvirt_snapshots_directory /tmp
+
+    if is_service_enabled tls-proxy; then
+        # Set the service port for a proxy to take the original
+        iniset $RAKSHA_CONF DEFAULT osapi_backupjobs_listen_port $RAKSHA_SERVICE_PORT_INT
+    fi
+
+    if [ "$SYSLOG" != "False" ]; then
+        iniset $RAKSHA_CONF DEFAULT use_syslog True
+    fi
+
+    iniset_rpc_backend raksha $RAKSHA_CONF DEFAULT
+
+    if [[ "$RAKSHA_SECURE_DELETE" == "False" ]]; then
+        iniset $RAKSHA_CONF DEFAULT secure_delete False
+    fi
+
+    if [ "$LOG_COLOR" == "True" ] && [ "$SYSLOG" == "False" ]; then
+        # Add color to logging output
+        iniset $RAKSHA_CONF DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(color)s%(levelname)s %(name)s [[01;36m%(request_id)s [00;36m%(user_id)s %(project_id)s%(color)s] [01;35m%(instance)s%(color)s%(message)s[00m"
+        iniset $RAKSHA_CONF DEFAULT logging_default_format_string "%(asctime)s.%(msecs)03d %(color)s%(levelname)s %(name)s [[00;36m-%(color)s] [01;35m%(instance)s%(color)s%(message)s[00m"
+        iniset $RAKSHA_CONF DEFAULT logging_debug_format_suffix "[00;33mfrom (pid=%(process)d) %(funcName)s %(pathname)s:%(lineno)d[00m"
+        iniset $RAKSHA_CONF DEFAULT logging_exception_prefix "%(color)s%(asctime)s.%(msecs)03d TRACE %(name)s [01;35m%(instance)s[00m"
+    fi
+
+}
+
+# create_raksha_accounts() - Set up common required raksha accounts
+
+# Tenant               User       Roles
+# ------------------------------------------------------------------
+# service              raksha     admin        # if enabled
+
+# Migrated from keystone_data.sh
+create_raksha_accounts() {
+
+    SERVICE_TENANT=$(keystone tenant-list | awk "/ $SERVICE_TENANT_NAME / { print \$2 }")
+    ADMIN_ROLE=$(keystone role-list | awk "/ admin / { print \$2 }")
+
+    # raksha
+    if [[ "$ENABLED_SERVICES" =~ "r-api" ]]; then
+        RAKSHA_USER=$(keystone user-create \
+            --name=raksha \
+            --pass="$SERVICE_PASSWORD" \
+            --tenant_id $SERVICE_TENANT \
+            --email=raksha@example.com \
+            | grep " id " | get_field 2)
+        keystone user-role-add \
+            --tenant_id $SERVICE_TENANT \
+            --user_id $RAKSHA_USER \
+            --role_id $ADMIN_ROLE
+        if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
+            RAKSHA_SERVICE=$(keystone service-create \
+                --name=raksha \
+                --type=backupjobs \
+                --description="Raksha Backupjobs Service" \
+                | grep " id " | get_field 2)
+            keystone endpoint-create \
+                --region RegionOne \
+                --service_id $RAKSHA_SERVICE \
+                --publicurl "$RAKSHA_SERVICE_PROTOCOL://$RAKSHA_SERVICE_HOST:$RAKSHA_SERVICE_PORT/v1/\$(tenant_id)s" \
+                --adminurl "$RAKSHA_SERVICE_PROTOCOL://$RAKSHA_SERVICE_HOST:$RAKSHA_SERVICE_PORT/v1/\$(tenant_id)s" \
+                --internalurl "$RAKSHA_SERVICE_PROTOCOL://$RAKSHA_SERVICE_HOST:$RAKSHA_SERVICE_PORT/v1/\$(tenant_id)s"
+        fi
+    fi
+}
+
+# create_raksha_cache_dir() - Part of the init_raksha() process
+function create_raksha_cache_dir() {
+    # Create cache dir
+    sudo mkdir -p $RAKSHA_AUTH_CACHE_DIR
+    sudo chown $STACK_USER $RAKSHA_AUTH_CACHE_DIR
+    rm -f $RAKSHA_AUTH_CACHE_DIR/*
+}
+
+# init_raksha() - Initialize database and volume group
+function init_raksha() {
+
+    if is_service_enabled $DATABASE_BACKENDS; then
+        # (Re)create raksha database
+        recreate_database raksha utf8
+
+        # Migrate raksha database
+        $RAKSHA_BIN_DIR/raksha-manage db sync
+    fi
+
+
+    create_raksha_cache_dir
+}
+
+# install_raksha() - Collect source and prepare
+function install_raksha() {
+    git_clone $RAKSHA_REPO $RAKSHA_DIR $RAKSHA_BRANCH
+    setup_develop $RAKSHA_DIR
+}
+
+# install_rakshaclient() - Collect source and prepare
+function install_rakshaclient() {
+    git_clone $RAKSHACLIENT_REPO $RAKSHACLIENT_DIR $RAKSHACLIENT_BRANCH
+    setup_develop $RAKSHACLIENT_DIR
+}
+
+# start_raksha() - Start running processes, including screen
+function start_raksha() {
+
+    screen_it r-api "cd $RAKSHA_DIR && $RAKSHA_BIN_DIR/raksha-api --config-file $RAKSHA_CONF"
+    screen_it r-sch "cd $RAKSHA_DIR && $RAKSHA_BIN_DIR/raksha-scheduler --config-file $RAKSHA_CONF"
+    screen_it r-bjob "cd $RAKSHA_DIR && $RAKSHA_BIN_DIR/raksha-backupjobs --config-file $RAKSHA_CONF"
+
+    # Start proxies if enabled
+    if is_service_enabled r-api && is_service_enabled tls-proxy; then
+        start_tls_proxy '*' $RAKSHA_SERVICE_PORT $RAKSHA_SERVICE_HOST $RAKSHA_SERVICE_PORT_INT &
+    fi
+}
+
+# stop_raksha() - Stop running processes
+function stop_raksha() {
+    # Kill the raksha screen windows
+    for serv in r-api r-bjob r-sch ; do
+        screen -S $SCREEN_NAME -p $serv -X kill
+    done
+}
+
+
+# Restore xtrace
+$XTRACE
+
+# Local variables:
+# mode: shell-script
+# End:

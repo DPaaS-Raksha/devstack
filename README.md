@@ -85,42 +85,30 @@ Example (Qpid):
 
 # Swift
 
-Swift is disabled by default.  When enabled, it is configured with
-only one replica to avoid being IO/memory intensive on a small
-vm. When running with only one replica the account, container and
-object services will run directly in screen. The others services like
-replicator, updaters or auditor runs in background.
+Swift is enabled by default configured with only one replica to avoid being IO/memory intensive on a small vm. When running with only one replica the account, container and object services will run directly in screen. The others services like replicator, updaters or auditor runs in background.
 
-If you would like to enable Swift you can add this to your `localrc` :
+If you would like to disable Swift you can add this to your `localrc` :
 
-    enable_service s-proxy s-object s-container s-account
+    disable_service s-proxy s-object s-container s-account
 
-If you want a minimal Swift install with only Swift and Keystone you
-can have this instead in your `localrc`:
+If you want a minimal Swift install with only Swift and Keystone you can have this instead in your `localrc`:
 
     disable_all_services
     enable_service key mysql s-proxy s-object s-container s-account
 
-If you only want to do some testing of a real normal swift cluster
-with multiple replicas you can do so by customizing the variable
-`SWIFT_REPLICAS` in your `localrc` (usually to 3).
+If you only want to do some testing of a real normal swift cluster with multiple replicas you can do so by customizing the variable `SWIFT_REPLICAS` in your `localrc` (usually to 3).
 
 # Swift S3
 
-If you are enabling `swift3` in `ENABLED_SERVICES` devstack will
-install the swift3 middleware emulation. Swift will be configured to
-act as a S3 endpoint for Keystone so effectively replacing the
-`nova-objectstore`.
+If you are enabling `swift3` in `ENABLED_SERVICES` devstack will install the swift3 middleware emulation. Swift will be configured to act as a S3 endpoint for Keystone so effectively replacing the `nova-objectstore`.
 
-Only Swift proxy server is launched in the screen session all other
-services are started in background and managed by `swift-init` tool.
+Only Swift proxy server is launched in the screen session all other services are started in background and managed by `swift-init` tool.
 
-# Neutron
+# Quantum
 
 Basic Setup
 
-In order to enable Neutron a single node setup, you'll need the
-following settings in your `localrc` :
+In order to enable Quantum a single node setup, you'll need the following settings in your `localrc` :
 
     disable_service n-net
     enable_service q-svc
@@ -128,51 +116,24 @@ following settings in your `localrc` :
     enable_service q-dhcp
     enable_service q-l3
     enable_service q-meta
-    enable_service neutron
+    enable_service quantum
     # Optional, to enable tempest configuration as part of devstack
     enable_service tempest
 
 Then run `stack.sh` as normal.
 
-devstack supports adding specific Neutron configuration flags to the service, Open vSwitch plugin and LinuxBridge plugin configuration files. To make use of this feature, the following variables are defined and can be configured in your `localrc` file:
+devstack supports adding specific Quantum configuration flags to both the Open vSwitch and LinuxBridge plugin configuration files. To make use of this feature, the following variables are defined and can be configured in your `localrc` file:
 
-    Variable Name             Config File  Section Modified
+    Variable Name             Plugin Config File Section Modified
     -------------------------------------------------------------------------------------
-    Q_SRV_EXTRA_OPTS          Plugin       `OVS` (for Open Vswitch) or `LINUX_BRIDGE` (for LinuxBridge)
-    Q_AGENT_EXTRA_AGENT_OPTS  Plugin       AGENT
-    Q_AGENT_EXTRA_SRV_OPTS    Plugin       `OVS` (for Open Vswitch) or `LINUX_BRIDGE` (for LinuxBridge)
-    Q_SRV_EXTRA_DEFAULT_OPTS  Service      DEFAULT
+    Q_SRV_EXTRA_OPTS          `OVS` (for Open Vswitch) or `LINUX_BRIDGE` (for LinuxBridge)
+    Q_AGENT_EXTRA_AGENT_OPTS  AGENT
+    Q_AGENT_EXTRA_SRV_OPTS    `OVS` (for Open Vswitch) or `LINUX_BRIDGE` (for LinuxBridge)
 
 An example of using the variables in your `localrc` is below:
 
     Q_AGENT_EXTRA_AGENT_OPTS=(tunnel_type=vxlan vxlan_udp_port=8472)
     Q_SRV_EXTRA_OPTS=(tenant_network_type=vxlan)
-
-devstack also supports configuring the Neutron ML2 plugin. The ML2 plugin can run with the OVS, LinuxBridge, or Hyper-V agents on compute hosts. A simple way to configure the ml2 plugin is shown below:
-
-    # VLAN configuration
-    Q_PLUGIN=ml2
-    ENABLE_TENANT_VLANS=True
-
-    # GRE tunnel configuration
-    Q_PLUGIN=ml2
-    ENABLE_TENANT_TUNNELS=True
-
-    # VXLAN tunnel configuration
-    Q_PLUGIN=ml2
-    Q_ML2_TENANT_NETWORK_TYPE=vxlan
-
-The above will default in devstack to using the OVS on each compute host. To change this, set the `Q_AGENT` variable to the agent you want to run (e.g. linuxbridge).
-
-    Variable Name                    Notes
-    -------------------------------------------------------------------------------------
-    Q_AGENT                          This specifies which agent to run with the ML2 Plugin (either `openvswitch` or `linuxbridge`).
-    Q_ML2_PLUGIN_MECHANISM_DRIVERS   The ML2 MechanismDrivers to load. The default is none. Note, ML2 will work with the OVS and LinuxBridge agents by default.
-    Q_ML2_PLUGIN_TYPE_DRIVERS        The ML2 TypeDrivers to load. Defaults to all available TypeDrivers.
-    Q_ML2_PLUGIN_GRE_TYPE_OPTIONS    GRE TypeDriver options. Defaults to none.
-    Q_ML2_PLUGIN_VXLAN_TYPE_OPTIONS  VXLAN TypeDriver options. Defaults to none.
-    Q_ML2_PLUGIN_VLAN_TYPE_OPTIONS   VLAN TypeDriver options. Defaults to none.
-    Q_AGENT_EXTRA_AGENT_OPTS         Extra configuration options to pass to the OVS or LinuxBridge Agent.
 
 # Tempest
 
@@ -183,7 +144,7 @@ If tempest has been successfully configured, a basic set of smoke tests can be r
 
 # Multi-Node Setup
 
-A more interesting setup involves running multiple compute nodes, with Neutron networks connecting VMs on different compute nodes.
+A more interesting setup involves running multiple compute nodes, with Quantum networks connecting VMs on different compute nodes.
 You should run at least one "controller node", which should have a `stackrc` that includes at least:
 
     disable_service n-net
@@ -192,7 +153,7 @@ You should run at least one "controller node", which should have a `stackrc` tha
     enable_service q-dhcp
     enable_service q-l3
     enable_service q-meta
-    enable_service neutron
+    enable_service quantum
 
 You likely want to change your `localrc` to run a scheduler that will balance VMs across hosts:
 
@@ -200,7 +161,7 @@ You likely want to change your `localrc` to run a scheduler that will balance VM
 
 You can then run many compute nodes, each of which should have a `stackrc` which includes the following, with the IP address of the above controller node:
 
-    ENABLED_SERVICES=n-cpu,rabbit,g-api,neutron,q-agt
+    ENABLED_SERVICES=n-cpu,rabbit,g-api,quantum,q-agt
     SERVICE_HOST=[IP of controller node]
     MYSQL_HOST=$SERVICE_HOST
     RABBIT_HOST=$SERVICE_HOST
@@ -214,5 +175,15 @@ Cells is a new scaling option with a full spec at http://wiki.openstack.org/blue
 To setup a cells environment add the following to your `localrc`:
 
     enable_service n-cell
+    enable_service n-api-meta
+    MULTI_HOST=True
 
-Be aware that there are some features currently missing in cells, one notable one being security groups.  The exercises have been patched to disable functionality not supported by cells.
+    # The following have not been tested with cells, they may or may not work.
+    disable_service n-obj
+    disable_service cinder
+    disable_service c-sch
+    disable_service c-api
+    disable_service c-vol
+    disable_service n-xvnc
+
+Be aware that there are some features currently missing in cells, one notable one being security groups.

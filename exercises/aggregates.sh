@@ -42,8 +42,6 @@ source $TOP_DIR/exerciserc
 # Test as the admin user
 . $TOP_DIR/openrc admin admin
 
-# Cells does not support aggregates.
-is_service_enabled n-cell && exit 55
 
 # Create an aggregate
 # ===================

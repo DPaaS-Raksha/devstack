@@ -10,7 +10,7 @@ echo "Begin DevStack Exercise: $0"
 echo "*********************************************************************"
 
 # This script exits on an error so that errors don't compound and you see
-# only the first error that occurred.
+# only the first error that occured.
 set -o errexit
 
 # Print the commands being run so that we can see the command that triggers
@@ -33,9 +33,9 @@ source $TOP_DIR/functions
 # Import EC2 configuration
 source $TOP_DIR/eucarc
 
-# Import neutron functions if needed
-if is_service_enabled neutron; then
-    source $TOP_DIR/lib/neutron
+# Import quantum functions if needed
+if is_service_enabled quantum; then
+    source $TOP_DIR/lib/quantum
 fi
 
 # Import exercise configuration
@@ -58,17 +58,11 @@ SECGROUP=${SECGROUP:-euca_secgroup}
 IMAGE=`euca-describe-images | grep machine | grep ${DEFAULT_IMAGE_NAME} | cut -f2 | head -n1`
 die_if_not_set $LINENO IMAGE "Failure getting image $DEFAULT_IMAGE_NAME"
 
-if is_service_enabled n-cell; then
-    # Cells does not support security groups, so force the use of "default"
-    SECGROUP="default"
-    echo "Using the default security group because of Cells."
-else
-    # Add a secgroup
-    if ! euca-describe-groups | grep -q $SECGROUP; then
-        euca-add-group -d "$SECGROUP description" $SECGROUP
-        if ! timeout $ASSOCIATE_TIMEOUT sh -c "while ! euca-describe-groups | grep -q $SECGROUP; do sleep 1; done"; then
-            die $LINENO "Security group not created"
-        fi
+# Add a secgroup
+if ! euca-describe-groups | grep -q $SECGROUP; then
+    euca-add-group -d "$SECGROUP description" $SECGROUP
+    if ! timeout $ASSOCIATE_TIMEOUT sh -c "while ! euca-describe-groups | grep -q $SECGROUP; do sleep 1; done"; then
+        die $LINENO "Security group not created"
     fi
 fi
 
@@ -83,7 +77,7 @@ fi
 
 # Volumes
 # -------
-if is_service_enabled c-vol && ! is_service_enabled n-cell; then
+if [[ "$ENABLED_SERVICES" =~ "c-vol" ]]; then
    VOLUME_ZONE=`euca-describe-availability-zones | head -n1 | cut -f2`
    die_if_not_set $LINENO VOLUME_ZONE "Failure to find zone for volume"
 
@@ -91,12 +85,12 @@ if is_service_enabled c-vol && ! is_service_enabled n-cell; then
    die_if_not_set $LINENO VOLUME "Failure to create volume"
 
    # Test that volume has been created
-   VOLUME=`euca-describe-volumes $VOLUME | cut -f2`
+   VOLUME=`euca-describe-volumes | cut -f2`
    die_if_not_set $LINENO VOLUME "Failure to get volume"
 
    # Test volume has become available
    if ! timeout $RUNNING_TIMEOUT sh -c "while ! euca-describe-volumes $VOLUME | grep -q available; do sleep 1; done"; then
-       die $LINENO "volume didn't become available within $RUNNING_TIMEOUT seconds"
+       die $LINENO "volume didnt become available within $RUNNING_TIMEOUT seconds"
    fi
 
    # Attach volume to an instance
@@ -123,45 +117,41 @@ else
     echo "Volume Tests Skipped"
 fi
 
-if is_service_enabled n-cell; then
-    echo "Floating IP Tests Skipped because of Cells."
-else
-    # Allocate floating address
-    FLOATING_IP=`euca-allocate-address | cut -f2`
-    die_if_not_set $LINENO FLOATING_IP "Failure allocating floating IP"
+# Allocate floating address
+FLOATING_IP=`euca-allocate-address | cut -f2`
+die_if_not_set $LINENO FLOATING_IP "Failure allocating floating IP"
 
-    # Associate floating address
-    euca-associate-address -i $INSTANCE $FLOATING_IP || \
-        die $LINENO "Failure associating address $FLOATING_IP to $INSTANCE"
+# Associate floating address
+euca-associate-address -i $INSTANCE $FLOATING_IP || \
+    die $LINENO "Failure associating address $FLOATING_IP to $INSTANCE"
 
-    # Authorize pinging
-    euca-authorize -P icmp -s 0.0.0.0/0 -t -1:-1 $SECGROUP || \
-        die $LINENO "Failure authorizing rule in $SECGROUP"
+# Authorize pinging
+euca-authorize -P icmp -s 0.0.0.0/0 -t -1:-1 $SECGROUP || \
+    die $LINENO "Failure authorizing rule in $SECGROUP"
 
-    # Test we can ping our floating ip within ASSOCIATE_TIMEOUT seconds
-    ping_check "$PUBLIC_NETWORK_NAME" $FLOATING_IP $ASSOCIATE_TIMEOUT
+# Test we can ping our floating ip within ASSOCIATE_TIMEOUT seconds
+ping_check "$PUBLIC_NETWORK_NAME" $FLOATING_IP $ASSOCIATE_TIMEOUT
 
-    # Revoke pinging
-    euca-revoke -P icmp -s 0.0.0.0/0 -t -1:-1 $SECGROUP || \
-        die $LINENO "Failure revoking rule in $SECGROUP"
+# Revoke pinging
+euca-revoke -P icmp -s 0.0.0.0/0 -t -1:-1 $SECGROUP || \
+    die $LINENO "Failure revoking rule in $SECGROUP"
 
-    # Release floating address
-    euca-disassociate-address $FLOATING_IP || \
-        die $LINENO "Failure disassociating address $FLOATING_IP"
+# Release floating address
+euca-disassociate-address $FLOATING_IP || \
+    die $LINENO "Failure disassociating address $FLOATING_IP"
 
-    # Wait just a tick for everything above to complete so release doesn't fail
-    if ! timeout $ASSOCIATE_TIMEOUT sh -c "while euca-describe-addresses | grep $INSTANCE | grep -q $FLOATING_IP; do sleep 1; done"; then
-        die $LINENO "Floating ip $FLOATING_IP not disassociated within $ASSOCIATE_TIMEOUT seconds"
-    fi
+# Wait just a tick for everything above to complete so release doesn't fail
+if ! timeout $ASSOCIATE_TIMEOUT sh -c "while euca-describe-addresses | grep $INSTANCE | grep -q $FLOATING_IP; do sleep 1; done"; then
+    die $LINENO "Floating ip $FLOATING_IP not disassociated within $ASSOCIATE_TIMEOUT seconds"
+fi
 
-    # Release floating address
-    euca-release-address $FLOATING_IP || \
-        die $LINENO "Failure releasing address $FLOATING_IP"
+# Release floating address
+euca-release-address $FLOATING_IP || \
+    die $LINENO "Failure releasing address $FLOATING_IP"
 
-    # Wait just a tick for everything above to complete so terminate doesn't fail
-    if ! timeout $ASSOCIATE_TIMEOUT sh -c "while euca-describe-addresses | grep -q $FLOATING_IP; do sleep 1; done"; then
-        die $LINENO "Floating ip $FLOATING_IP not released within $ASSOCIATE_TIMEOUT seconds"
-    fi
+# Wait just a tick for everything above to complete so terminate doesn't fail
+if ! timeout $ASSOCIATE_TIMEOUT sh -c "while euca-describe-addresses | grep -q $FLOATING_IP; do sleep 1; done"; then
+    die $LINENO "Floating ip $FLOATING_IP not released within $ASSOCIATE_TIMEOUT seconds"
 fi
 
 # Terminate instance
@@ -176,12 +166,8 @@ if ! timeout $TERMINATE_TIMEOUT sh -c "while euca-describe-instances $INSTANCE |
     die $LINENO "server didn't terminate within $TERMINATE_TIMEOUT seconds"
 fi
 
-if [[ "$SECGROUP" = "default" ]] ; then
-    echo "Skipping deleting default security group"
-else
-    # Delete secgroup
-    euca-delete-group $SECGROUP || die $LINENO "Failure deleting security group $SECGROUP"
-fi
+# Delete secgroup
+euca-delete-group $SECGROUP || die $LINENO "Failure deleting security group $SECGROUP"
 
 set +o xtrace
 echo "*********************************************************************"

@@ -21,7 +21,7 @@ fi
 # ``disable_service`` functions in ``localrc``.
 # For example, to enable Swift add this to ``localrc``:
 #  enable_service swift
-# In order to enable Neutron (a single node setup) add the following
+# In order to enable Quantum (a single node setup) add the following
 # settings in `` localrc``:
 #  disable_service n-net
 #  enable_service q-svc
@@ -29,16 +29,13 @@ fi
 #  enable_service q-dhcp
 #  enable_service q-l3
 #  enable_service q-meta
-#  enable_service neutron
+#  enable_service quantum
 #  # Optional, to enable tempest configuration as part of devstack
 #  enable_service tempest
-ENABLED_SERVICES=g-api,g-reg,key,n-api,n-crt,n-obj,n-cpu,n-net,n-cond,cinder,c-sch,c-api,c-vol,n-sch,n-novnc,n-xvnc,n-cauth,horizon,rabbit,tempest,mysql
+ENABLED_SERVICES=g-api,g-reg,key,n-api,n-crt,n-obj,n-cpu,n-net,n-cond,cinder,c-sch,c-api,c-vol,n-sch,n-novnc,n-xvnc,n-cauth,horizon,rabbit,tempest,mysql,raksha,r-sch,r-api,r-bjob
 
 # Set the default Nova APIs to enable
 NOVA_ENABLED_APIS=ec2,osapi_compute,metadata
-
-# Configure Identity API version: 2.0, 3
-IDENTITY_API_VERSION=2.0
 
 # Whether to use 'dev mode' for screen windows. Dev mode works by
 # stuffing text into the screen windows so that a developer can use
@@ -76,6 +73,14 @@ CINDER_BRANCH=${CINDER_BRANCH:-master}
 CINDERCLIENT_REPO=${CINDERCLIENT_REPO:-${GIT_BASE}/openstack/python-cinderclient.git}
 CINDERCLIENT_BRANCH=${CINDERCLIENT_BRANCH:-master}
 
+# volume service
+RAKSHA_REPO=${RAKSHA_REPO:-${GIT_BASE}/DPaaS-Raksha/raksha.git}
+RAKSHA_BRANCH=${RAKSHA_BRANCH:-master}
+
+# volume client
+RAKSHACLIENT_REPO=${RAKSHACLIENT_REPO:-${GIT_BASE}/DPaaS-Raksha/python-rakshaclient.git}
+RAKSHACLIENT_BRANCH=${RAKSHACLIENT_BRANCH:-master}
+
 # image catalog service
 GLANCE_REPO=${GLANCE_REPO:-${GIT_BASE}/openstack/glance.git}
 GLANCE_BRANCH=${GLANCE_BRANCH:-master}
@@ -93,7 +98,7 @@ HEATCLIENT_REPO=${HEATCLIENT_REPO:-${GIT_BASE}/openstack/python-heatclient.git}
 HEATCLIENT_BRANCH=${HEATCLIENT_BRANCH:-master}
 
 # django powered web control panel for openstack
-HORIZON_REPO=${HORIZON_REPO:-${GIT_BASE}/openstack/horizon.git}
+HORIZON_REPO=${HORIZON_REPO:-${GIT_BASE}/DPaaS-Raksha/horizon.git}
 HORIZON_BRANCH=${HORIZON_BRANCH:-master}
 
 # unified auth system (manages accounts/tokens)
@@ -120,13 +125,13 @@ OPENSTACKCLIENT_BRANCH=${OPENSTACKCLIENT_BRANCH:-master}
 PBR_REPO=${PBR_REPO:-${GIT_BASE}/openstack-dev/pbr.git}
 PBR_BRANCH=${PBR_BRANCH:-master}
 
-# neutron service
-NEUTRON_REPO=${NEUTRON_REPO:-${GIT_BASE}/openstack/neutron.git}
-NEUTRON_BRANCH=${NEUTRON_BRANCH:-master}
+# quantum service
+QUANTUM_REPO=${QUANTUM_REPO:-${GIT_BASE}/openstack/quantum.git}
+QUANTUM_BRANCH=${QUANTUM_BRANCH:-master}
 
-# neutron client
-NEUTRONCLIENT_REPO=${NEUTRONCLIENT_REPO:-${GIT_BASE}/openstack/python-neutronclient.git}
-NEUTRONCLIENT_BRANCH=${NEUTRONCLIENT_BRANCH:-master}
+# quantum client
+QUANTUMCLIENT_REPO=${QUANTUMCLIENT_REPO:-${GIT_BASE}/openstack/python-quantumclient.git}
+QUANTUMCLIENT_BRANCH=${QUANTUMCLIENT_BRANCH:-master}
 
 # storage service
 SWIFT_REPO=${SWIFT_REPO:-${GIT_BASE}/openstack/swift.git}
@@ -180,7 +185,8 @@ case "$VIRT_DRIVER" in
         fi
         ;;
     xenserver)
-        # Xen config common to nova and neutron
+        # Xen config common to nova and quantum
+        XENAPI_CONNECTION_URL=${XENAPI_CONNECTION_URL:-"http://169.254.0.1"}
         XENAPI_USER=${XENAPI_USER:-"root"}
         ;;
     *)
@@ -215,8 +221,8 @@ esac
 # ``IMAGE_URLS`` to be set directly in ``localrc``.
 case "$VIRT_DRIVER" in
     openvz)
-        DEFAULT_IMAGE_NAME=${DEFAULT_IMAGE_NAME:-ubuntu-12.04-x86_64}
-        IMAGE_URLS=${IMAGE_URLS:-"http://download.openvz.org/template/precreated/ubuntu-12.04.x86_64.tar.gz"};;
+        DEFAULT_IMAGE_NAME=${DEFAULT_IMAGE_NAME:-ubuntu-11.10-x86_64}
+        IMAGE_URLS=${IMAGE_URLS:-"http://download.openvz.org/template/precreated/ubuntu-11.10-x86_64.tar.gz"};;
     libvirt)
         case "$LIBVIRT_TYPE" in
             lxc) # the cirros root disk in the uec tarball is empty, so it will not work for lxc
@@ -235,8 +241,8 @@ case "$VIRT_DRIVER" in
 esac
 
 
-# 10Gb default volume backing file size
-VOLUME_BACKING_FILE_SIZE=${VOLUME_BACKING_FILE_SIZE:-10250M}
+# 5Gb default volume backing file size
+VOLUME_BACKING_FILE_SIZE=${VOLUME_BACKING_FILE_SIZE:-5130M}
 
 # Name of the LVM volume group to use/create for iscsi volumes
 VOLUME_GROUP=${VOLUME_GROUP:-stack-volumes}

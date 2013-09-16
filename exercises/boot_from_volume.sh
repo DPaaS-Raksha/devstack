@@ -11,7 +11,7 @@ echo "Begin DevStack Exercise: $0"
 echo "*********************************************************************"
 
 # This script exits on an error so that errors don't compound and you see
-# only the first error that occurred.
+# only the first error that occured.
 set -o errexit
 
 # Print the commands being run so that we can see the command that triggers
@@ -32,9 +32,9 @@ source $TOP_DIR/functions
 # Import configuration
 source $TOP_DIR/openrc
 
-# Import neutron functions if needed
-if is_service_enabled neutron; then
-    source $TOP_DIR/lib/neutron
+# Import quantum functions if needed
+if is_service_enabled quantum; then
+    source $TOP_DIR/lib/quantum
 fi
 
 # Import exercise configuration
@@ -80,18 +80,12 @@ die_if_not_set $LINENO IMAGE "Failure getting image $DEFAULT_IMAGE_NAME"
 # List security groups
 nova secgroup-list
 
-if is_service_enabled n-cell; then
-    # Cells does not support security groups, so force the use of "default"
-    SECGROUP="default"
-    echo "Using the default security group because of Cells."
-else
-    # Create a secgroup
-    if ! nova secgroup-list | grep -q $SECGROUP; then
-        nova secgroup-create $SECGROUP "$SECGROUP description"
-        if ! timeout $ASSOCIATE_TIMEOUT sh -c "while ! nova secgroup-list | grep -q $SECGROUP; do sleep 1; done"; then
-            echo "Security group not created"
-            exit 1
-        fi
+# Create a secgroup
+if ! nova secgroup-list | grep -q $SECGROUP; then
+    nova secgroup-create $SECGROUP "$SECGROUP description"
+    if ! timeout $ASSOCIATE_TIMEOUT sh -c "while ! nova secgroup-list | grep -q $SECGROUP; do sleep 1; done"; then
+        echo "Security group not created"
+        exit 1
     fi
 fi
 
@@ -206,12 +200,8 @@ fi
 end_time=$(date +%s)
 echo "Completed cinder delete in $((end_time - start_time)) seconds"
 
-if [[ $SECGROUP = "default" ]] ; then
-    echo "Skipping deleting default security group"
-else
-    # Delete secgroup
-    nova secgroup-delete $SECGROUP || die $LINENO "Failure deleting security group $SECGROUP"
-fi
+# Delete secgroup
+nova secgroup-delete $SECGROUP || die $LINENO "Failure deleting security group $SECGROUP"
 
 set +o xtrace
 echo "*********************************************************************"

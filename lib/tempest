@@ -3,7 +3,7 @@
 
 # Dependencies:
 # ``functions`` file
-# ``lib/nova`` service is running
+# ``lib/nova`` service is runing
 # <list other global vars that are assumed to be defined>
 # - ``DEST``, ``FILES``
 # - ``ADMIN_PASSWORD``
@@ -42,7 +42,6 @@ set +o xtrace
 TEMPEST_DIR=$DEST/tempest
 TEMPEST_CONF_DIR=$TEMPEST_DIR/etc
 TEMPEST_CONF=$TEMPEST_CONF_DIR/tempest.conf
-TEMPEST_STATE_PATH=${TEMPEST_STATE_PATH:=$DATA_DIR/tempest}
 
 NOVA_SOURCE_DIR=$DEST/nova
 
@@ -79,7 +78,7 @@ function configure_tempest() {
     # sudo python setup.py deploy
 
     # This function exits on an error so that errors don't compound and you see
-    # only the first error that occurred.
+    # only the first error that occured.
     errexit=$(set +o | grep errexit)
     set -o errexit
 
@@ -186,19 +185,15 @@ function configure_tempest() {
     fi
 
     if is_service_enabled q-l3; then
-        public_network_id=$(neutron net-list | grep $PUBLIC_NETWORK_NAME | \
+        public_network_id=$(quantum net-list | grep $PUBLIC_NETWORK_NAME | \
             awk '{print $2}')
         if [ "$Q_USE_NAMESPACE" == "False" ]; then
             # If namespaces are disabled, devstack will create a single
             # public router that tempest should be configured to use.
-            public_router_id=$(neutron router-list | awk "/ $Q_ROUTER_NAME / \
+            public_router_id=$(quantum router-list | awk "/ $Q_ROUTER_NAME / \
                { print \$2 }")
         fi
     fi
-
-    # Oslo
-    iniset $TEMPEST_CONF DEFAULT lock_path $TEMPEST_STATE_PATH
-    mkdir -p $TEMPEST_STATE_PATH
 
     # Timeouts
     iniset $TEMPEST_CONF compute build_timeout $BUILD_TIMEOUT
@@ -228,7 +223,7 @@ function configure_tempest() {
     iniset $TEMPEST_CONF compute change_password_available False
     # Note(nati) current tempest don't create network for each tenant
     # so reuse same tenant for now
-    if is_service_enabled neutron; then
+    if is_service_enabled quantum; then
         TEMPEST_ALLOW_TENANT_ISOLATION=${TEMPEST_ALLOW_TENANT_ISOLATION:-False}
     fi
     iniset $TEMPEST_CONF compute allow_tenant_isolation ${TEMPEST_ALLOW_TENANT_ISOLATION:-True}
@@ -256,6 +251,10 @@ function configure_tempest() {
     # Compute admin
     iniset $TEMPEST_CONF "compute-admin" password "$password" # DEPRECATED
 
+    # Network
+    if is_service_enabled quantum; then
+        iniset $TEMPEST_CONF network quantum_available "True"
+    fi
     iniset $TEMPEST_CONF network api_version 2.0
     iniset $TEMPEST_CONF network tenant_networks_reachable "$tenant_networks_reachable"
     iniset $TEMPEST_CONF network public_network_id "$public_network_id"
@@ -269,32 +268,18 @@ function configure_tempest() {
     iniset $TEMPEST_CONF boto http_socket_timeout 30
     iniset $TEMPEST_CONF boto ssh_user ${DEFAULT_INSTANCE_USER:-cirros}
 
-    # Scenario
-    iniset $TEMPEST_CONF scenario img_dir "$FILES/images/cirros-0.3.1-x86_64-uec"
+    # Orchestration
+    if is_service_enabled heat; then
+        iniset $TEMPEST_CONF orchestration heat_available "True"
+    fi
 
     # Volume
     CINDER_MULTI_LVM_BACKEND=$(trueorfalse False $CINDER_MULTI_LVM_BACKEND)
-    if [ $CINDER_MULTI_LVM_BACKEND == "True" ]; then
+    if [ $CINDER_MULTI_LVM_BACKEND == "True "]; then
         iniset $TEMPEST_CONF volume multi_backend_enabled "True"
         iniset $TEMPEST_CONF volume backend1_name "LVM_iSCSI"
         iniset $TEMPEST_CONF volume backend2_name "LVM_iSCSI_2"
     fi
-
-    # Dashboard
-    iniset $TEMPEST_CONF dashboard dashboard_url "http://$SERVICE_HOST/"
-    iniset $TEMPEST_CONF dashboard login_url "http://$SERVICE_HOST/auth/login/"
-
-    # cli
-    iniset $TEMPEST_CONF cli cli_dir $NOVA_BIN_DIR
-
-    # service_available
-    for service in nova cinder glance neutron swift heat horizon ; do
-        if is_service_enabled $service ; then
-            iniset $TEMPEST_CONF service_available $service "True"
-        else
-            iniset $TEMPEST_CONF service_available $service "False"
-        fi
-    done
 
     echo "Created tempest configuration file:"
     cat $TEMPEST_CONF

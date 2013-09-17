@@ -67,23 +67,23 @@ CEILOMETERCLIENT_BRANCH=${CEILOMETERCLIENT_BRANCH:-master}
 
 # volume service
 CINDER_REPO=${CINDER_REPO:-${GIT_BASE}/openstack/cinder.git}
-CINDER_BRANCH=${CINDER_BRANCH:-master}
+CINDER_BRANCH=stable/grizzly
 
 # volume client
 CINDERCLIENT_REPO=${CINDERCLIENT_REPO:-${GIT_BASE}/openstack/python-cinderclient.git}
 CINDERCLIENT_BRANCH=${CINDERCLIENT_BRANCH:-master}
 
-# volume service
+# raksha service
 RAKSHA_REPO=${RAKSHA_REPO:-${GIT_BASE}/DPaaS-Raksha/raksha.git}
 RAKSHA_BRANCH=${RAKSHA_BRANCH:-master}
 
-# volume client
+# raksha client
 RAKSHACLIENT_REPO=${RAKSHACLIENT_REPO:-${GIT_BASE}/DPaaS-Raksha/python-rakshaclient.git}
 RAKSHACLIENT_BRANCH=${RAKSHACLIENT_BRANCH:-master}
 
 # image catalog service
 GLANCE_REPO=${GLANCE_REPO:-${GIT_BASE}/openstack/glance.git}
-GLANCE_BRANCH=${GLANCE_BRANCH:-master}
+GLANCE_BRANCH=stable/grizzly
 
 # python glance client library
 GLANCECLIENT_REPO=${GLANCECLIENT_REPO:-${GIT_BASE}/openstack/python-glanceclient.git}
@@ -103,7 +103,7 @@ HORIZON_BRANCH=${HORIZON_BRANCH:-master}
 
 # unified auth system (manages accounts/tokens)
 KEYSTONE_REPO=${KEYSTONE_REPO:-${GIT_BASE}/openstack/keystone.git}
-KEYSTONE_BRANCH=${KEYSTONE_BRANCH:-master}
+KEYSTONE_BRANCH=stable/grizzly
 
 # python keystone client library to nova that horizon uses
 KEYSTONECLIENT_REPO=${KEYSTONECLIENT_REPO:-${GIT_BASE}/openstack/python-keystoneclient.git}
@@ -111,7 +111,7 @@ KEYSTONECLIENT_BRANCH=${KEYSTONECLIENT_BRANCH:-master}
 
 # compute service
 NOVA_REPO=${NOVA_REPO:-${GIT_BASE}/openstack/nova.git}
-NOVA_BRANCH=${NOVA_BRANCH:-master}
+NOVA_BRANCH=stable/grizzly
 
 # python client library to nova that horizon (and others) use
 NOVACLIENT_REPO=${NOVACLIENT_REPO:-${GIT_BASE}/openstack/python-novaclient.git}
@@ -127,7 +127,7 @@ PBR_BRANCH=${PBR_BRANCH:-master}
 
 # quantum service
 QUANTUM_REPO=${QUANTUM_REPO:-${GIT_BASE}/openstack/quantum.git}
-QUANTUM_BRANCH=${QUANTUM_BRANCH:-master}
+QUANTUM_BRANCH=stable/grizzly
 
 # quantum client
 QUANTUMCLIENT_REPO=${QUANTUMCLIENT_REPO:-${GIT_BASE}/openstack/python-quantumclient.git}
@@ -135,7 +135,7 @@ QUANTUMCLIENT_BRANCH=${QUANTUMCLIENT_BRANCH:-master}
 
 # storage service
 SWIFT_REPO=${SWIFT_REPO:-${GIT_BASE}/openstack/swift.git}
-SWIFT_BRANCH=${SWIFT_BRANCH:-master}
+SWIFT_BRANCH=stable/grizzly
 SWIFT3_REPO=${SWIFT3_REPO:-${GIT_BASE}/fujita/swift3.git}
 SWIFT3_BRANCH=${SWIFT3_BRANCH:-master}
 
